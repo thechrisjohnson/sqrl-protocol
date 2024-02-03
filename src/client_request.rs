@@ -1,10 +1,12 @@
 //! All of the code needed for sending client requests to a SQRL server
 
-use crate::{encode_newline_data, error::SqrlProtocolError, SqrlUrl,
-    decode_public_key, decode_signature, get_or_error, parse_newline_data, parse_query_data,
+use crate::{
+    decode_public_key, decode_signature, encode_newline_data,
+    error::SqrlProtocolError,
+    get_or_error, parse_newline_data, parse_query_data,
     protocol_version::ProtocolVersion,
     server_response::{ServerResponse, TIFValue},
-    PROTOCOL_VERSIONS,
+    SqrlUrl, PROTOCOL_VERSIONS,
 };
 use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
 use ed25519_dalek::{Signature, VerifyingKey};
@@ -460,7 +462,10 @@ impl TryFrom<&str> for ClientOption {
             "hardlock" => Ok(ClientOption::Hardlock),
             "cps" => Ok(ClientOption::ClientProvidedSession),
             "suk" => Ok(ClientOption::ServerUnlockKey),
-            _ => Err(SqrlProtocolError::new(format!("Invalid client option {}", value))),
+            _ => Err(SqrlProtocolError::new(format!(
+                "Invalid client option {}",
+                value
+            ))),
         }
     }
 }
@@ -498,7 +503,10 @@ impl ServerData {
                 server_response,
                 original_response: base64_string.to_owned(),
             }),
-            Err(_) => Err(SqrlProtocolError::new(format!("Invalid server data: {}", &data))),
+            Err(_) => Err(SqrlProtocolError::new(format!(
+                "Invalid server data: {}",
+                &data
+            ))),
         }
     }
 
