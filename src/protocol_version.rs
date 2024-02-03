@@ -26,19 +26,28 @@ impl ProtocolVersion {
                 let low: u8 = match versions.next() {
                     Some(x) => x.parse::<u8>()?,
                     None => {
-                        return Err(SqrlProtocolError::new(format!("Invalid version number {}", sub)));
+                        return Err(SqrlProtocolError::new(format!(
+                            "Invalid version number {}",
+                            sub
+                        )));
                     }
                 };
                 let high: u8 = match versions.next() {
                     Some(x) => x.parse::<u8>()?,
                     None => {
-                        return Err(SqrlProtocolError::new(format!("Invalid version number {}", sub)));
+                        return Err(SqrlProtocolError::new(format!(
+                            "Invalid version number {}",
+                            sub
+                        )));
                     }
                 };
 
                 // Make sure the range is valid
                 if low >= high {
-                    return Err(SqrlProtocolError::new(format!("Invalid version number {}", sub)));
+                    return Err(SqrlProtocolError::new(format!(
+                        "Invalid version number {}",
+                        sub
+                    )));
                 }
 
                 // Set the neccesary values
@@ -62,7 +71,10 @@ impl ProtocolVersion {
 
     /// Compares two protocol version objects, returning the highest version
     /// supported by both
-    pub fn get_max_matching_version(&self, other: &ProtocolVersion) -> Result<u8, SqrlProtocolError> {
+    pub fn get_max_matching_version(
+        &self,
+        other: &ProtocolVersion,
+    ) -> Result<u8, SqrlProtocolError> {
         let min_max = if self.max_version > other.max_version {
             other.max_version
         } else {

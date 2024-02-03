@@ -9,8 +9,8 @@ use crate::error::SqrlProtocolError;
 use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
 use ed25519_dalek::{Signature, VerifyingKey};
 use std::collections::HashMap;
-use url::Url;
 use std::fmt;
+use url::Url;
 
 /// The general protocl for SQRL urls
 pub const SQRL_PROTOCOL: &str = "sqrl";
@@ -64,7 +64,6 @@ impl fmt::Display for SqrlUrl {
         write!(f, "{}", self.url)
     }
 }
-
 
 pub(crate) fn get_or_error(
     map: &HashMap<String, String>,
@@ -131,7 +130,10 @@ pub(crate) fn parse_newline_data(data: &str) -> Result<HashMap<String, String>, 
         if let Some((key, value)) = token.split_once('=') {
             map.insert(key.to_owned(), value.trim().to_owned());
         } else if !token.is_empty() {
-            return Err(SqrlProtocolError::new(format!("Invalid newline data {}", token)));
+            return Err(SqrlProtocolError::new(format!(
+                "Invalid newline data {}",
+                token
+            )));
         }
     }
 
