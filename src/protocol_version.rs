@@ -1,6 +1,6 @@
 //! Code for exchanging and matching a common SQRL protocol version
 
-use crate::error::SqrlProtocolError;
+use crate::error::SqrlError;
 use std::fmt;
 
 /// An object representing the SQRL protocol versions supported by a client
@@ -13,7 +13,7 @@ pub struct ProtocolVersion {
 
 impl ProtocolVersion {
     /// Create a new object based on the version string
-    pub fn new(versions: &str) -> Result<Self, SqrlProtocolError> {
+    pub fn new(versions: &str) -> Result<Self, SqrlError> {
         let mut prot = ProtocolVersion {
             versions: 0,
             max_version: 0,
@@ -26,28 +26,19 @@ impl ProtocolVersion {
                 let low: u8 = match versions.next() {
                     Some(x) => x.parse::<u8>()?,
                     None => {
-                        return Err(SqrlProtocolError::new(format!(
-                            "Invalid version number {}",
-                            sub
-                        )));
+                        return Err(SqrlError::new(format!("Invalid version number {}", sub)));
                     }
                 };
                 let high: u8 = match versions.next() {
                     Some(x) => x.parse::<u8>()?,
                     None => {
-                        return Err(SqrlProtocolError::new(format!(
-                            "Invalid version number {}",
-                            sub
-                        )));
+                        return Err(SqrlError::new(format!("Invalid version number {}", sub)));
                     }
                 };
 
                 // Make sure the range is valid
                 if low >= high {
-                    return Err(SqrlProtocolError::new(format!(
-                        "Invalid version number {}",
-                        sub
-                    )));
+                    return Err(SqrlError::new(format!("Invalid version number {}", sub)));
                 }
 
                 // Set the neccesary values
@@ -71,10 +62,7 @@ impl ProtocolVersion {
 
     /// Compares two protocol version objects, returning the highest version
     /// supported by both
-    pub fn get_max_matching_version(
-        &self,
-        other: &ProtocolVersion,
-    ) -> Result<u8, SqrlProtocolError> {
+    pub fn get_max_matching_version(&self, other: &ProtocolVersion) -> Result<u8, SqrlError> {
         let min_max = if self.max_version > other.max_version {
             other.max_version
         } else {
@@ -91,7 +79,7 @@ impl ProtocolVersion {
             }
         }
 
-        Err(SqrlProtocolError::new(format!(
+        Err(SqrlError::new(format!(
             "No matching supported version! Ours: {} Theirs: {}",
             self, other
         )))

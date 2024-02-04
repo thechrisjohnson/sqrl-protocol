@@ -4,7 +4,7 @@ use super::{
     encode_newline_data, get_or_error, parse_newline_data, protocol_version::ProtocolVersion,
     PROTOCOL_VERSIONS,
 };
-use crate::error::SqrlProtocolError;
+use crate::error::SqrlError;
 use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
 use std::{collections::HashMap, fmt, str::FromStr};
 
@@ -66,7 +66,7 @@ impl ServerResponse {
     }
 
     /// Decode a server response from a base64-encoded value
-    pub fn from_base64(base64_string: &str) -> Result<Self, SqrlProtocolError> {
+    pub fn from_base64(base64_string: &str) -> Result<Self, SqrlError> {
         // Decode the response
         let server_data = String::from_utf8(BASE64_URL_SAFE_NO_PAD.decode(base64_string)?)?;
         Self::from_str(&server_data)
@@ -115,7 +115,7 @@ impl fmt::Display for ServerResponse {
 }
 
 impl FromStr for ServerResponse {
-    type Err = SqrlProtocolError;
+    type Err = SqrlError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let data = parse_newline_data(s)?;
@@ -190,10 +190,10 @@ pub enum TIFValue {
 
 impl TIFValue {
     /// Parse the TIF values based on a string
-    pub fn parse_str(value: &str) -> Result<Vec<Self>, SqrlProtocolError> {
+    pub fn parse_str(value: &str) -> Result<Vec<Self>, SqrlError> {
         match value.parse::<u16>() {
             Ok(x) => Ok(Self::from_u16(x)),
-            Err(_) => Err(SqrlProtocolError::new(format!(
+            Err(_) => Err(SqrlError::new(format!(
                 "Unable to parse server response status code (tif): {}",
                 value
             ))),

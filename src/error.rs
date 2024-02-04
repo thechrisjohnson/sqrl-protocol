@@ -3,53 +3,53 @@
 use std::{fmt, num::ParseIntError, string::FromUtf8Error};
 
 /// An error that can occur during SQRL protocol
-pub struct SqrlProtocolError {
+pub struct SqrlError {
     error_message: String,
 }
 
-impl SqrlProtocolError {
-    /// Create a new SqrlProtocolError with the string as error message
+impl SqrlError {
+    /// Create a new SqrlError with the string as error message
     pub fn new(error: String) -> Self {
-        SqrlProtocolError {
+        SqrlError {
             error_message: error,
         }
     }
 }
 
-impl fmt::Display for SqrlProtocolError {
+impl fmt::Display for SqrlError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.error_message)
     }
 }
 
-impl fmt::Debug for SqrlProtocolError {
+impl fmt::Debug for SqrlError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.error_message)
     }
 }
 
-impl std::error::Error for SqrlProtocolError {}
+impl std::error::Error for SqrlError {}
 
-impl From<url::ParseError> for SqrlProtocolError {
+impl From<url::ParseError> for SqrlError {
     fn from(error: url::ParseError) -> Self {
-        SqrlProtocolError::new(error.to_string())
+        SqrlError::new(error.to_string())
     }
 }
 
-impl From<base64::DecodeError> for SqrlProtocolError {
+impl From<base64::DecodeError> for SqrlError {
     fn from(error: base64::DecodeError) -> Self {
-        SqrlProtocolError::new(error.to_string())
+        SqrlError::new(error.to_string())
     }
 }
 
-impl From<FromUtf8Error> for SqrlProtocolError {
+impl From<FromUtf8Error> for SqrlError {
     fn from(error: FromUtf8Error) -> Self {
-        SqrlProtocolError::new(error.to_string())
+        SqrlError::new(error.to_string())
     }
 }
 
-impl From<ParseIntError> for SqrlProtocolError {
+impl From<ParseIntError> for SqrlError {
     fn from(value: ParseIntError) -> Self {
-        SqrlProtocolError::new(value.to_string())
+        SqrlError::new(value.to_string())
     }
 }
