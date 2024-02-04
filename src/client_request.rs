@@ -2,7 +2,7 @@
 
 use crate::{
     decode_public_key, decode_signature, encode_newline_data,
-    error::SqrlProtocolError,
+    error::SqrlError,
     get_or_error, parse_newline_data, parse_query_data,
     protocol_version::ProtocolVersion,
     server_response::{ServerResponse, TIFValue},
@@ -62,7 +62,7 @@ impl ClientRequest {
     }
 
     /// Parse a client request from a query string
-    pub fn from_query_string(query_string: &str) -> Result<Self, SqrlProtocolError> {
+    pub fn from_query_string(query_string: &str) -> Result<Self, SqrlError> {
         let map = parse_query_data(query_string)?;
         let client_parameters_string = get_or_error(
             &map,
@@ -140,20 +140,20 @@ impl ClientRequest {
     }
 
     /// Validate that the values input in the client request are valid
-    pub fn validate(&self) -> Result<(), SqrlProtocolError> {
+    pub fn validate(&self) -> Result<(), SqrlError> {
         self.client_params.validate()?;
 
         // If the pik is set the pids must also (and vice-versa)
         if self.previous_identity_signature.is_some()
             && self.client_params.previous_identity_key.is_none()
         {
-            return Err(SqrlProtocolError::new(
+            return Err(SqrlError::new(
                 "Previous identity signature set, but no previous identity key set".to_owned(),
             ));
         } else if self.previous_identity_signature.is_none()
             && self.client_params.previous_identity_key.is_some()
         {
-            return Err(SqrlProtocolError::new(
+            return Err(SqrlError::new(
                 "Previous identity key set, but no previous identity signature".to_owned(),
             ));
         }
@@ -163,7 +163,7 @@ impl ClientRequest {
             || self.client_params.command == ClientCommand::Remove)
             && self.unlock_request_signature.is_none()
         {
-            return Err(SqrlProtocolError::new(
+            return Err(SqrlError::new(
                 "When attempting to enable identity, unlock request signature (urs) must be set"
                     .to_owned(),
             ));
@@ -177,9 +177,9 @@ impl ClientRequest {
                 .contains(&TIFValue::CurrentIdMatch) =>
             {
                 if self.client_params.server_unlock_key.is_none() {
-                    return Err(SqrlProtocolError::new("If attempting to re-enable identity (cmd=enable), must include server unlock key (suk)".to_owned()));
+                    return Err(SqrlError::new("If attempting to re-enable identity (cmd=enable), must include server unlock key (suk)".to_owned()));
                 } else if self.client_params.verify_unlock_key.is_none() {
-                    return Err(SqrlProtocolError::new("If attempting to re-enable identity (cmd=enable), must include verify unlock key (vuk)".to_owned()));
+                    return Err(SqrlError::new("If attempting to re-enable identity (cmd=enable), must include verify unlock key (vuk)".to_owned()));
                 }
             }
             _ => (),
@@ -232,7 +232,7 @@ impl ClientParameters {
     }
 
     /// Parse a base64-encoded client parameter value
-    pub fn from_base64(base64_string: &str) -> Result<Self, SqrlProtocolError> {
+    pub fn from_base64(base64_string: &str) -> Result<Self, SqrlError> {
         let query_string = String::from_utf8(BASE64_URL_SAFE_NO_PAD.decode(base64_string)?)?;
         Self::from_str(&query_string)
     }
@@ -243,7 +243,7 @@ impl ClientParameters {
     }
 
     /// Verify the client request is valid
-    pub fn validate(&self) -> Result<(), SqrlProtocolError> {
+    pub fn validate(&self) -> Result<(), SqrlError> {
         Ok(())
     }
 }
@@ -293,7 +293,7 @@ impl fmt::Display for ClientParameters {
 }
 
 impl FromStr for ClientParameters {
-    type Err = SqrlProtocolError;
+    type Err = SqrlError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let map = parse_newline_data(s)?;
@@ -318,7 +318,7 @@ impl FromStr for ClientParameters {
             Some(s) => match s.parse::<u8>() {
                 Ok(b) => Some(b),
                 Err(_) => {
-                    return Err(SqrlProtocolError::new(format!(
+                    return Err(SqrlError::new(format!(
                         "Invalid client request: Unable to parse btn {}",
                         s
                     )))
@@ -417,7 +417,7 @@ pub enum ClientOption {
 }
 
 impl ClientOption {
-    fn from_option_string(opt: &str) -> Result<Vec<Self>, SqrlProtocolError> {
+    fn from_option_string(opt: &str) -> Result<Vec<Self>, SqrlError> {
         let mut options: Vec<ClientOption> = Vec::new();
         for option in opt.split('~') {
             options.push(ClientOption::try_from(option)?)
@@ -453,7 +453,7 @@ impl fmt::Display for ClientOption {
 }
 
 impl TryFrom<&str> for ClientOption {
-    type Error = SqrlProtocolError;
+    type Error = SqrlError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
@@ -462,10 +462,7 @@ impl TryFrom<&str> for ClientOption {
             "hardlock" => Ok(ClientOption::Hardlock),
             "cps" => Ok(ClientOption::ClientProvidedSession),
             "suk" => Ok(ClientOption::ServerUnlockKey),
-            _ => Err(SqrlProtocolError::new(format!(
-                "Invalid client option {}",
-                value
-            ))),
+            _ => Err(SqrlError::new(format!("Invalid client option {}", value))),
         }
     }
 }
@@ -492,7 +489,7 @@ pub enum ServerData {
 
 impl ServerData {
     /// Parse the base64-encoded server data
-    pub fn from_base64(base64_string: &str) -> Result<Self, SqrlProtocolError> {
+    pub fn from_base64(base64_string: &str) -> Result<Self, SqrlError> {
         let data = String::from_utf8(BASE64_URL_SAFE_NO_PAD.decode(base64_string)?)?;
         if let Ok(parsed) = SqrlUrl::parse(&data) {
             return Ok(ServerData::Url { url: parsed });
@@ -503,10 +500,7 @@ impl ServerData {
                 server_response,
                 original_response: base64_string.to_owned(),
             }),
-            Err(_) => Err(SqrlProtocolError::new(format!(
-                "Invalid server data: {}",
-                &data
-            ))),
+            Err(_) => Err(SqrlError::new(format!("Invalid server data: {}", &data))),
         }
     }
 
