@@ -146,7 +146,7 @@ pub(crate) fn encode_newline_data(map: &HashMap<&str, &str>) -> String {
     result
 }
 
-pub(crate) fn vec_to_u8_32(vector: &Vec<u8>) -> Result<[u8; 32], SqrlError> {
+pub(crate) fn vec_to_u8_32(vector: &[u8]) -> Result<[u8; 32], SqrlError> {
     let mut result = [0; 32];
     if vector.len() != 32 {
         return Err(SqrlError::new(format!(
@@ -159,7 +159,7 @@ pub(crate) fn vec_to_u8_32(vector: &Vec<u8>) -> Result<[u8; 32], SqrlError> {
     Ok(result)
 }
 
-pub(crate) fn vec_to_u8_64(vector: &Vec<u8>) -> Result<[u8; 64], SqrlError> {
+pub(crate) fn vec_to_u8_64(vector: &[u8]) -> Result<[u8; 64], SqrlError> {
     let mut result = [0; 64];
     if vector.len() != 64 {
         return Err(SqrlError::new(format!(
