@@ -1,8 +1,8 @@
 //! Code needed for SQRL client and server communication
 
+#![deny(missing_docs)]
 pub mod client_request;
 pub mod error;
-pub mod protocol_version;
 pub mod server_response;
 
 use crate::error::SqrlError;
@@ -26,6 +26,11 @@ pub struct SqrlUrl {
 
 impl SqrlUrl {
     /// Parse a SQRL url string and convert it into the object
+    /// ```rust
+    /// use sqrl_protocol::SqrlUrl;
+    ///
+    /// let sqrl_url = SqrlUrl::parse("sqrl://example.com?nut=1234abcd").unwrap();
+    /// ```
     pub fn parse(url: &str) -> Result<Self, SqrlError> {
         let parsed = Url::parse(url)?;
         if parsed.scheme() != SQRL_PROTOCOL {
@@ -45,6 +50,12 @@ impl SqrlUrl {
     }
 
     /// Get the auth domain used for calculating identities
+    /// ```rust
+    /// use sqrl_protocol::SqrlUrl;
+    ///
+    /// let sqrl_url = SqrlUrl::parse("sqrl://example.com/auth/path?nut=1234abcd").unwrap();
+    /// assert_eq!("example.com/auth/path", sqrl_url.get_auth_domain())
+    /// ```
     pub fn get_auth_domain(&self) -> String {
         format!("{}{}", self.get_domain(), self.get_path())
     }
@@ -170,4 +181,174 @@ pub(crate) fn vec_to_u8_64(vector: &[u8]) -> Result<[u8; 64], SqrlError> {
 
     result[..64].copy_from_slice(&vector[..64]);
     Ok(result)
+}
+
+/// The versions of the sqrl protocol supported by a client/server
+#[derive(Debug, PartialEq)]
+pub struct ProtocolVersion {
+    versions: u128,
+    max_version: u8,
+}
+
+impl ProtocolVersion {
+    /// Create a new object based on the version string
+    /// ```rust
+    /// use sqrl_protocol::ProtocolVersion;
+    ///
+    /// let version = ProtocolVersion::new("1,3,6-10").unwrap();
+    /// ```
+    pub fn new(versions: &str) -> Result<Self, SqrlError> {
+        let mut prot = ProtocolVersion {
+            versions: 0,
+            max_version: 0,
+        };
+        for sub in versions.split(',') {
+            if sub.contains('-') {
+                let mut versions = sub.split('-');
+
+                // Parse out the lower and higher end of the range
+                let low: u8 = match versions.next() {
+                    Some(x) => x.parse::<u8>()?,
+                    None => {
+                        return Err(SqrlError::new(format!("Invalid version number {}", sub)));
+                    }
+                };
+                let high: u8 = match versions.next() {
+                    Some(x) => x.parse::<u8>()?,
+                    None => {
+                        return Err(SqrlError::new(format!("Invalid version number {}", sub)));
+                    }
+                };
+
+                // Make sure the range is valid
+                if low >= high {
+                    return Err(SqrlError::new(format!("Invalid version number {}", sub)));
+                }
+
+                // Set the neccesary values
+                for i in low..high + 1 {
+                    prot.versions |= 0b00000001 << (i - 1);
+                }
+                if high > prot.max_version {
+                    prot.max_version = high;
+                }
+            } else {
+                let version = sub.parse::<u8>()?;
+                prot.versions |= 0b00000001 << (version - 1);
+                if version > prot.max_version {
+                    prot.max_version = version;
+                }
+            }
+        }
+
+        Ok(prot)
+    }
+
+    /// Compares two protocol version objects, returning the highest version
+    /// supported by both
+    /// ```rust
+    /// use sqrl_protocol::ProtocolVersion;
+    ///
+    /// let version = ProtocolVersion::new("1,3,5,7,9").unwrap();
+    /// let version2 = ProtocolVersion::new("2,4,5,8,10").unwrap();
+    /// assert_eq!(5, version.get_max_matching_version(&version2).unwrap());
+    /// ```
+    pub fn get_max_matching_version(&self, other: &ProtocolVersion) -> Result<u8, SqrlError> {
+        let min_max = if self.max_version > other.max_version {
+            other.max_version
+        } else {
+            self.max_version
+        };
+
+        let matches = self.versions & other.versions;
+
+        // Start from the highest match and work our way back
+        let bit: u128 = 0b00000001 << min_max;
+        for i in 0..min_max {
+            if matches & (bit >> i) == bit >> i {
+                return Ok(min_max - i + 1);
+            }
+        }
+
+        Err(SqrlError::new(format!(
+            "No matching supported version! Ours: {} Theirs: {}",
+            self, other
+        )))
+    }
+}
+
+impl fmt::Display for ProtocolVersion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut versions: Vec<String> = Vec::new();
+        let mut current_min: Option<u8> = None;
+        let mut bit: u128 = 0b00000001;
+        for i in 0..self.max_version {
+            if self.versions & bit == bit {
+                // If we don't have a current min set it.
+                // Otherwise, keep going until the range ends
+                if current_min.is_none() {
+                    current_min = Some(i);
+                }
+            } else {
+                // Did we experience a range, or just a single one?
+                if let Some(min) = current_min {
+                    if i == min + 1 {
+                        // A streak of one
+                        versions.push(format!("{}", min + 1));
+                    } else {
+                        versions.push(format!("{}-{}", min + 1, i));
+                    }
+
+                    current_min = None;
+                }
+            }
+
+            bit <<= 1;
+        }
+
+        // If we still have a min set, we need to run that same code again
+        if let Some(min) = current_min {
+            if self.max_version == min + 1 {
+                // A streak of one
+                versions.push(format!("{}", min + 1));
+            } else {
+                versions.push(format!("{}-{}", min + 1, self.max_version));
+            }
+        }
+
+        write!(f, "{}", versions.join(","))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn protocol_version_create_valid_version() {
+        ProtocolVersion::new("1,2,6-7").unwrap();
+    }
+
+    #[test]
+    fn protocol_version_create_invalid_version() {
+        if let Ok(version) = ProtocolVersion::new("1,2,7-3") {
+            panic!("Version considered valid! {}", version);
+        }
+    }
+
+    #[test]
+    fn protocol_version_match_highest_version() {
+        let client = ProtocolVersion::new("1-7").unwrap();
+        let server = ProtocolVersion::new("1,3,5").unwrap();
+        assert_eq!(5, client.get_max_matching_version(&server).unwrap());
+    }
+
+    #[test]
+    fn protocol_version_no_version_match() {
+        let client = ProtocolVersion::new("1-3,5-7").unwrap();
+        let server = ProtocolVersion::new("4,8-12").unwrap();
+        if let Ok(x) = client.get_max_matching_version(&server) {
+            panic!("Matching version found! {}", x);
+        }
+    }
 }

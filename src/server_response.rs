@@ -1,8 +1,7 @@
 //! Code for a server to respond to client requests
 
 use super::{
-    encode_newline_data, get_or_error, parse_newline_data, protocol_version::ProtocolVersion,
-    PROTOCOL_VERSIONS,
+    encode_newline_data, get_or_error, parse_newline_data, ProtocolVersion, PROTOCOL_VERSIONS,
 };
 use crate::error::SqrlError;
 use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
