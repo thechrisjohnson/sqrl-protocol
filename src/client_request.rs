@@ -4,9 +4,8 @@ use crate::{
     decode_public_key, decode_signature, encode_newline_data,
     error::SqrlError,
     get_or_error, parse_newline_data, parse_query_data,
-    protocol_version::ProtocolVersion,
     server_response::{ServerResponse, TIFValue},
-    SqrlUrl, PROTOCOL_VERSIONS,
+    ProtocolVersion, SqrlUrl, PROTOCOL_VERSIONS,
 };
 use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
 use ed25519_dalek::{Signature, VerifyingKey};
