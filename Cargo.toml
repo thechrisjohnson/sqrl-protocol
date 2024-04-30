@@ -4,7 +4,6 @@ version = "0.1.1"
 description = "An rust implementation of the protocol for Secure Quick Reliable Login (SQRL)"
 edition = "2021"
 license = "GPL-3.0-only"
-license-file = "LICENSE"
 repository = "https://github.com/thechrisjohnson/sqrl-protocol"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
