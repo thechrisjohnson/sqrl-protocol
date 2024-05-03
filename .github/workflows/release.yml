@@ -14,8 +14,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Publish crate
+    - uses: actions/checkout@v4
+    - name: Publish crate (dry-run)
       run: cargo publish --verbose --dry-run
     - name: Publish crate
       run: cargo publish --verbose --token ${{ secrets.CARGO_TOKEN }}
