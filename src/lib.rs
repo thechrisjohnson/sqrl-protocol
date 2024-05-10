@@ -8,8 +8,7 @@ pub mod server_response;
 use crate::error::SqrlError;
 use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
 use ed25519_dalek::{Signature, VerifyingKey};
-use std::collections::HashMap;
-use std::fmt;
+use std::{collections::HashMap, fmt, result};
 use url::Url;
 
 /// The general protocl for SQRL urls
@@ -17,6 +16,9 @@ pub const SQRL_PROTOCOL: &str = "sqrl";
 
 /// The current list of supported versions
 pub const PROTOCOL_VERSIONS: &str = "1";
+
+/// A default result type for the crate
+pub type Result<G> = result::Result<G, SqrlError>;
 
 /// Parses a SQRL url and breaks it into its parts
 #[derive(Debug, PartialEq)]
@@ -31,7 +33,7 @@ impl SqrlUrl {
     ///
     /// let sqrl_url = SqrlUrl::parse("sqrl://example.com?nut=1234abcd").unwrap();
     /// ```
-    pub fn parse(url: &str) -> Result<Self, SqrlError> {
+    pub fn parse(url: &str) -> Result<Self> {
         let parsed = Url::parse(url)?;
         if parsed.scheme() != SQRL_PROTOCOL {
             return Err(SqrlError::new(format!(
@@ -80,14 +82,14 @@ pub(crate) fn get_or_error(
     map: &HashMap<String, String>,
     key: &str,
     error_message: &str,
-) -> Result<String, SqrlError> {
+) -> Result<String> {
     match map.get(key) {
         Some(x) => Ok(x.to_owned()),
         None => Err(SqrlError::new(error_message.to_owned())),
     }
 }
 
-pub(crate) fn parse_query_data(query: &str) -> Result<HashMap<String, String>, SqrlError> {
+pub(crate) fn parse_query_data(query: &str) -> Result<HashMap<String, String>> {
     let mut map = HashMap::<String, String>::new();
     for token in query.split('&') {
         if let Some((key, value)) = token.split_once('=') {
@@ -99,7 +101,7 @@ pub(crate) fn parse_query_data(query: &str) -> Result<HashMap<String, String>, S
     Ok(map)
 }
 
-pub(crate) fn decode_public_key(key: &str) -> Result<VerifyingKey, SqrlError> {
+pub(crate) fn decode_public_key(key: &str) -> Result<VerifyingKey> {
     let bytes: [u8; 32];
     match BASE64_URL_SAFE_NO_PAD.decode(key) {
         Ok(x) => bytes = vec_to_u8_32(&x)?,
@@ -120,7 +122,7 @@ pub(crate) fn decode_public_key(key: &str) -> Result<VerifyingKey, SqrlError> {
     }
 }
 
-pub(crate) fn decode_signature(key: &str) -> Result<Signature, SqrlError> {
+pub(crate) fn decode_signature(key: &str) -> Result<Signature> {
     let bytes: [u8; 64];
     match BASE64_URL_SAFE_NO_PAD.decode(key) {
         Ok(x) => bytes = vec_to_u8_64(&x)?,
@@ -135,7 +137,7 @@ pub(crate) fn decode_signature(key: &str) -> Result<Signature, SqrlError> {
     Ok(Signature::from_bytes(&bytes))
 }
 
-pub(crate) fn parse_newline_data(data: &str) -> Result<HashMap<String, String>, SqrlError> {
+pub(crate) fn parse_newline_data(data: &str) -> Result<HashMap<String, String>> {
     let mut map = HashMap::<String, String>::new();
     for token in data.split('\n') {
         if let Some((key, value)) = token.split_once('=') {
@@ -157,7 +159,7 @@ pub(crate) fn encode_newline_data(map: &HashMap<&str, &str>) -> String {
     result
 }
 
-pub(crate) fn vec_to_u8_32(vector: &[u8]) -> Result<[u8; 32], SqrlError> {
+pub(crate) fn vec_to_u8_32(vector: &[u8]) -> Result<[u8; 32]> {
     let mut result = [0; 32];
     if vector.len() != 32 {
         return Err(SqrlError::new(format!(
@@ -170,7 +172,7 @@ pub(crate) fn vec_to_u8_32(vector: &[u8]) -> Result<[u8; 32], SqrlError> {
     Ok(result)
 }
 
-pub(crate) fn vec_to_u8_64(vector: &[u8]) -> Result<[u8; 64], SqrlError> {
+pub(crate) fn vec_to_u8_64(vector: &[u8]) -> Result<[u8; 64]> {
     let mut result = [0; 64];
     if vector.len() != 64 {
         return Err(SqrlError::new(format!(
@@ -197,7 +199,7 @@ impl ProtocolVersion {
     ///
     /// let version = ProtocolVersion::new("1,3,6-10").unwrap();
     /// ```
-    pub fn new(versions: &str) -> Result<Self, SqrlError> {
+    pub fn new(versions: &str) -> Result<Self> {
         let mut prot = ProtocolVersion {
             versions: 0,
             max_version: 0,
@@ -253,7 +255,7 @@ impl ProtocolVersion {
     /// let version2 = ProtocolVersion::new("2,4,5,8,10").unwrap();
     /// assert_eq!(5, version.get_max_matching_version(&version2).unwrap());
     /// ```
-    pub fn get_max_matching_version(&self, other: &ProtocolVersion) -> Result<u8, SqrlError> {
+    pub fn get_max_matching_version(&self, other: &ProtocolVersion) -> Result<u8> {
         let min_max = if self.max_version > other.max_version {
             other.max_version
         } else {
