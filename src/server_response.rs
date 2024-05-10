@@ -3,9 +3,9 @@
 use super::{
     encode_newline_data, get_or_error, parse_newline_data, ProtocolVersion, PROTOCOL_VERSIONS,
 };
-use crate::error::SqrlError;
+use crate::{error::SqrlError, Result};
 use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
-use std::{collections::HashMap, fmt, str::FromStr};
+use std::{collections::HashMap, fmt, result, str::FromStr};
 
 // The keys used to encode a server response
 const PROTOCOL_VERSION_KEY: &str = "ver";
@@ -65,7 +65,7 @@ impl ServerResponse {
     }
 
     /// Decode a server response from a base64-encoded value
-    pub fn from_base64(base64_string: &str) -> Result<Self, SqrlError> {
+    pub fn from_base64(base64_string: &str) -> Result<Self> {
         // Decode the response
         let server_data = String::from_utf8(BASE64_URL_SAFE_NO_PAD.decode(base64_string)?)?;
         Self::from_str(&server_data)
@@ -116,7 +116,7 @@ impl fmt::Display for ServerResponse {
 impl FromStr for ServerResponse {
     type Err = SqrlError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> result::Result<Self, Self::Err> {
         let data = parse_newline_data(s)?;
 
         // Validate the protocol version is supported
@@ -189,7 +189,7 @@ pub enum TIFValue {
 
 impl TIFValue {
     /// Parse the TIF values based on a string
-    pub fn parse_str(value: &str) -> Result<Vec<Self>, SqrlError> {
+    pub fn parse_str(value: &str) -> Result<Vec<Self>> {
         match value.parse::<u16>() {
             Ok(x) => Ok(Self::from_u16(x)),
             Err(_) => Err(SqrlError::new(format!(

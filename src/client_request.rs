@@ -5,11 +5,11 @@ use crate::{
     error::SqrlError,
     get_or_error, parse_newline_data, parse_query_data,
     server_response::{ServerResponse, TIFValue},
-    ProtocolVersion, SqrlUrl, PROTOCOL_VERSIONS,
+    ProtocolVersion, Result, SqrlUrl, PROTOCOL_VERSIONS,
 };
 use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
 use ed25519_dalek::{Signature, VerifyingKey};
-use std::{collections::HashMap, convert::TryFrom, fmt, str::FromStr};
+use std::{collections::HashMap, convert::TryFrom, fmt, result, str::FromStr};
 
 // Keys used for encoding ClientRequest
 const CLIENT_PARAMETERS_KEY: &str = "client";
@@ -61,7 +61,7 @@ impl ClientRequest {
     }
 
     /// Parse a client request from a query string
-    pub fn from_query_string(query_string: &str) -> Result<Self, SqrlError> {
+    pub fn from_query_string(query_string: &str) -> Result<Self> {
         let map = parse_query_data(query_string)?;
         let client_parameters_string = get_or_error(
             &map,
@@ -139,7 +139,7 @@ impl ClientRequest {
     }
 
     /// Validate that the values input in the client request are valid
-    pub fn validate(&self) -> Result<(), SqrlError> {
+    pub fn validate(&self) -> Result<()> {
         self.client_params.validate()?;
 
         // If the pik is set the pids must also (and vice-versa)
@@ -231,7 +231,7 @@ impl ClientParameters {
     }
 
     /// Parse a base64-encoded client parameter value
-    pub fn from_base64(base64_string: &str) -> Result<Self, SqrlError> {
+    pub fn from_base64(base64_string: &str) -> Result<Self> {
         let query_string = String::from_utf8(BASE64_URL_SAFE_NO_PAD.decode(base64_string)?)?;
         Self::from_str(&query_string)
     }
@@ -242,7 +242,7 @@ impl ClientParameters {
     }
 
     /// Verify the client request is valid
-    pub fn validate(&self) -> Result<(), SqrlError> {
+    pub fn validate(&self) -> Result<()> {
         Ok(())
     }
 }
@@ -294,7 +294,7 @@ impl fmt::Display for ClientParameters {
 impl FromStr for ClientParameters {
     type Err = SqrlError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> result::Result<Self, Self::Err> {
         let map = parse_newline_data(s)?;
         // Validate the protocol version is supported
         let ver_string = get_or_error(
@@ -416,7 +416,7 @@ pub enum ClientOption {
 }
 
 impl ClientOption {
-    fn from_option_string(opt: &str) -> Result<Vec<Self>, SqrlError> {
+    fn from_option_string(opt: &str) -> Result<Vec<Self>> {
         let mut options: Vec<ClientOption> = Vec::new();
         for option in opt.split('~') {
             options.push(ClientOption::try_from(option)?)
@@ -454,7 +454,7 @@ impl fmt::Display for ClientOption {
 impl TryFrom<&str> for ClientOption {
     type Error = SqrlError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn try_from(value: &str) -> Result<Self> {
         match value {
             "noiptest" => Ok(ClientOption::NoIPTest),
             "sqrlonly" => Ok(ClientOption::SQRLOnly),
@@ -488,7 +488,7 @@ pub enum ServerData {
 
 impl ServerData {
     /// Parse the base64-encoded server data
-    pub fn from_base64(base64_string: &str) -> Result<Self, SqrlError> {
+    pub fn from_base64(base64_string: &str) -> Result<Self> {
         let data = String::from_utf8(BASE64_URL_SAFE_NO_PAD.decode(base64_string)?)?;
         if let Ok(parsed) = SqrlUrl::parse(&data) {
             return Ok(ServerData::Url { url: parsed });
