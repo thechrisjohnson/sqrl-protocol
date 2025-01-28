@@ -241,7 +241,7 @@ impl TIFValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::{distributions::Alphanumeric, thread_rng, Rng};
+    use rand::{distr::Alphanumeric, rng, Rng};
 
     const TEST_SERVER_RESPONSE: &str = "dmVyPTENCm51dD0xV005bGZGMVNULXoNCnRpZj01DQpxcnk9L2NsaS5zcXJsP251dD0xV005bGZGMVNULXoNCnN1az1CTUZEbTdiUGxzUW9qdUpzb0RUdmxTMU1jbndnU2N2a3RGODR2TGpzY0drDQo";
 
@@ -259,17 +259,17 @@ mod tests {
 
     #[test]
     fn server_response_encode_decode() {
-        let nut: String = thread_rng()
+        let nut: String = rng()
             .sample_iter(&Alphanumeric)
             .take(30)
             .map(char::from)
             .collect();
-        let qry: String = thread_rng()
+        let qry: String = rng()
             .sample_iter(&Alphanumeric)
             .take(30)
             .map(char::from)
             .collect();
-        let tif: u16 = thread_rng().gen_range(0..1023);
+        let tif: u16 = rng().random_range(0..1023);
 
         let initial_response = ServerResponse::new(nut, TIFValue::from_u16(tif), qry);
         let decoded_response = ServerResponse::from_base64(&initial_response.to_base64()).unwrap();
