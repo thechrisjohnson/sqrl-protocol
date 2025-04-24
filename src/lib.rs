@@ -11,7 +11,7 @@ use ed25519_dalek::{Signature, VerifyingKey};
 use std::{collections::HashMap, fmt, result};
 use url::Url;
 
-/// The general protocl for SQRL urls
+/// The general protocol for SQRL urls
 pub const SQRL_PROTOCOL: &str = "sqrl";
 
 /// The current list of supported versions
@@ -227,7 +227,7 @@ impl ProtocolVersion {
                     return Err(SqrlError::new(format!("Invalid version number {}", sub)));
                 }
 
-                // Set the neccesary values
+                // Set the necessary values
                 for i in low..high + 1 {
                     prot.versions |= 0b00000001 << (i - 1);
                 }
