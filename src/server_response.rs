@@ -109,7 +109,7 @@ impl fmt::Display for ServerResponse {
             map.insert(ASK_KEY, ask);
         }
 
-        write!(f, "{}", &encode_newline_data(&map))
+        write!(f, "{}", encode_newline_data(&map))
     }
 }
 
@@ -241,7 +241,7 @@ impl TIFValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::{RngExt, distr::Alphanumeric, rng};
+    use rand::{distr::Alphanumeric, rng, RngExt};
 
     const TEST_SERVER_RESPONSE: &str = "dmVyPTENCm51dD0xV005bGZGMVNULXoNCnRpZj01DQpxcnk9L2NsaS5zcXJsP251dD0xV005bGZGMVNULXoNCnN1az1CTUZEbTdiUGxzUW9qdUpzb0RUdmxTMU1jbndnU2N2a3RGODR2TGpzY0drDQo";
 
