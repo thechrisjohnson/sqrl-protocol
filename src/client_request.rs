@@ -8,7 +8,7 @@ use crate::{
     ProtocolVersion, Result, SqrlUrl, PROTOCOL_VERSIONS,
 };
 use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
-use ed25519_dalek::{Signature, VerifyingKey};
+use ed25519_dalek::{ed25519::signature::SignerMut, Signature, SigningKey, VerifyingKey};
 use std::{collections::HashMap, convert::TryFrom, fmt, result, str::FromStr};
 
 // Keys used for encoding ClientRequest
@@ -47,15 +47,30 @@ pub struct ClientRequest {
 impl ClientRequest {
     /// Generate a new client request
     pub fn new(
-        client_params: ClientParameters,
+        mut client_params: ClientParameters,
         server_data: ServerData,
-        identity_signature: Signature,
+        signing_key: &mut SigningKey,
+        previous_signing_key: Option<&mut SigningKey>,
     ) -> Self {
+        client_params.identity_key = signing_key.verifying_key();
+
+        let mut to_sign = get_client_request_signed_string(&client_params, &server_data);
+        let mut previous_identity_signature = None;
+        // If we have a previous signing key, set it in the client params and update the string to sign
+        if let Some(previous_key) = previous_signing_key {
+            client_params.previous_identity_key = Some(previous_key.verifying_key());
+            to_sign = get_client_request_signed_string(&client_params, &server_data);
+            previous_identity_signature = Some(previous_key.sign(to_sign.as_bytes()));
+        }
+
+        // Sign the request
+        let identity_signature = signing_key.sign(to_sign.as_bytes());
+
         ClientRequest {
             client_params,
             server_data,
             identity_signature,
-            previous_identity_signature: None,
+            previous_identity_signature,
             unlock_request_signature: None,
         }
     }
@@ -131,11 +146,37 @@ impl ClientRequest {
 
     /// Get the portion of the client request that is signed
     pub fn get_signed_string(&self) -> String {
-        format!(
-            "{}{}",
-            self.client_params.to_base64(),
-            &self.server_data.to_base64()
-        )
+        get_client_request_signed_string(&self.client_params, &self.server_data)
+    }
+
+    /// Verify that the signature of a client request is valid
+    pub fn verify_signatures(&self) -> Result<()> {
+        let signed_string = self.get_signed_string();
+        if let Err(e) = self
+            .client_params
+            .identity_key
+            .verify_strict(signed_string.as_bytes(), &self.identity_signature)
+        {
+            return Err(SqrlError::new(format!(
+                "Failed to validate identity signature: {}",
+                e
+            )));
+        }
+
+        if let Some(previous_identity_key) = self.client_params.previous_identity_key {
+            match self.previous_identity_signature {
+                Some(previous_identity_signature) => {
+                    if let Err(e) = previous_identity_key.verify_strict(signed_string.as_bytes(), &previous_identity_signature) {
+                        return Err(SqrlError::new(format!("Failed to validate previous identity signature: {}", e)));
+                    }
+                }
+                None => return Err(SqrlError::new("Unable to validate previous identity signature: Found previous identity key with no previous identity signature".to_owned()))
+            };
+        } else if self.previous_identity_signature.is_some() {
+            return Err(SqrlError::new("Unable to validate previous identity signature: Found previous identity signature with no previous identity key!".to_owned()));
+        }
+
+        Ok(())
     }
 
     /// Validate that the values input in the client request are valid
@@ -183,6 +224,8 @@ impl ClientRequest {
             }
             _ => (),
         }
+
+        self.verify_signatures()?;
 
         Ok(())
     }
@@ -527,6 +570,13 @@ impl fmt::Display for ServerData {
             }
         }
     }
+}
+
+fn get_client_request_signed_string(
+    client_params: &ClientParameters,
+    server_data: &ServerData,
+) -> String {
+    format!("{}{}", client_params.to_base64(), server_data.to_base64())
 }
 
 #[cfg(test)]
