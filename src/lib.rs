@@ -14,14 +14,21 @@ use url::Url;
 /// The general protocol for SQRL urls
 pub const SQRL_PROTOCOL: &str = "sqrl";
 
+/// The scheme used when posting to SQRL urls (aka "https")
+pub const REQUEST_URL_SCHEME: &str = "https";
+
 /// The current list of supported versions
 pub const PROTOCOL_VERSIONS: &str = "1";
 
 /// A default result type for the crate
 pub type Result<G> = result::Result<G, SqrlError>;
 
+// Used for string replace when dealing with sqrl->https scheme shift
+const SQRL_FULL_URL_SCHEME: &str = "sqrl://";
+const REQUEST_FULL_URL_SCHEME: &str = "https://";
+
 /// Parses a SQRL url and breaks it into its parts
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SqrlUrl {
     url: Url,
 }
@@ -60,6 +67,22 @@ impl SqrlUrl {
     /// ```
     pub fn get_auth_domain(&self) -> String {
         format!("{}{}", self.get_domain(), self.get_path())
+    }
+
+    /// Convert a SQRL Url into a URL that can be used for actually querying a server
+    /// This just means replacing the sqrl:// scheme with https://
+    /// ```rust
+    /// use sqrl_protocol::SqrlUrl;
+    ///
+    /// let sqrl_url = SqrlUrl::parse("sqrl://example.com/auth/path?nut=1234abcd").unwrap();
+    /// assert_eq!("https://example.com/auth/path?nut=1234abcd", sqrl_url.get_request_url())
+    /// ```
+    pub fn get_request_url(&self) -> String {
+        self
+            .url
+            .as_str()
+            .replace(SQRL_FULL_URL_SCHEME, REQUEST_FULL_URL_SCHEME)
+            .to_owned()
     }
 
     fn get_domain(&self) -> String {
@@ -326,6 +349,8 @@ impl fmt::Display for ProtocolVersion {
 mod tests {
     use super::*;
 
+    const VALID_SQRL_URL: &str = "sqrl://example.com/auth/path?nut=1234abcd";
+
     #[test]
     fn protocol_version_create_valid_version() {
         ProtocolVersion::new("1,2,6-7").unwrap();
@@ -352,5 +377,43 @@ mod tests {
         if let Ok(x) = client.get_max_matching_version(&server) {
             panic!("Matching version found! {}", x);
         }
+    }
+
+    #[test]
+    fn sqrl_url_parse_accepts_sqrl_url() {
+        let url = SqrlUrl::parse(VALID_SQRL_URL);
+        assert!(url.is_ok());
+    }
+
+    #[test]
+    fn sqrl_url_parse_errors_on_invalid_url() {
+        let url = SqrlUrl::parse("invalid-url-string");
+        assert!(url.is_err());
+    }
+
+    #[test]
+    fn sqrl_url_parse_errors_on_incorrect_protocol() {
+        let url = SqrlUrl::parse(&VALID_SQRL_URL.replace("sqrl", "https"));
+        assert!(url.is_err());
+    }
+
+    #[test]
+    fn sqrl_url_get_auth_domain_includes_path() {
+        let url = SqrlUrl::parse(VALID_SQRL_URL).unwrap();
+        assert_eq!(&url.get_auth_domain(), "example.com/auth/path");
+    }
+
+    #[test]
+    fn sqrl_url_get_auth_domain_no_path_if_not_passed() {
+        let url = SqrlUrl::parse("sqrl://example.com?nut=123").unwrap();
+        assert_eq!(&url.get_auth_domain(), "example.com");
+    }
+
+    #[test]
+    fn sqrl_url_get_request_url_returns_https() {
+        let sqrl_url = SqrlUrl::parse(VALID_SQRL_URL).unwrap();
+        let url = Url::parse(&sqrl_url.get_request_url()).unwrap();
+        assert!(url.has_host());
+        assert_eq!(url.scheme(), "https");
     }
 }
