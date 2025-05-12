@@ -14,14 +14,21 @@ use url::Url;
 /// The general protocol for SQRL urls
 pub const SQRL_PROTOCOL: &str = "sqrl";
 
+/// The scheme used when posting to SQRL urls (aka "https")
+pub const REQUEST_URL_SCHEME: &str = "https";
+
 /// The current list of supported versions
 pub const PROTOCOL_VERSIONS: &str = "1";
 
 /// A default result type for the crate
 pub type Result<G> = result::Result<G, SqrlError>;
 
+// Used for string replace when dealing with sqrl->https scheme shift
+const SQRL_FULL_URL_SCHEME: &str = "sqrl://";
+const REQUEST_FULL_URL_SCHEME: &str = "https://";
+
 /// Parses a SQRL url and breaks it into its parts
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SqrlUrl {
     url: Url,
 }
@@ -60,6 +67,37 @@ impl SqrlUrl {
     /// ```
     pub fn get_auth_domain(&self) -> String {
         format!("{}{}", self.get_domain(), self.get_path())
+    }
+
+    /// Convert a SQRL Url into a URL that can be used for actually querying a server
+    /// This just means replacing the sqrl:// scheme with https://
+    /// ```rust
+    /// use sqrl_protocol::SqrlUrl;
+    ///
+    /// let sqrl_url = SqrlUrl::parse("sqrl://example.com/auth/path?nut=1234abcd").unwrap();
+    /// assert_eq!("https://example.com/auth/path?nut=1234abcd", sqrl_url.get_request_url().unwrap())
+    /// ```
+    pub fn get_request_url(&self) -> Result<String> {
+        let new_string = self
+            .url
+            .as_str()
+            .replace(SQRL_FULL_URL_SCHEME, REQUEST_FULL_URL_SCHEME);
+
+        if let Ok(new_url) = Url::parse(&new_string) {
+            if new_url.scheme() == REQUEST_URL_SCHEME {
+                Ok(new_url.into())
+            } else {
+                Err(SqrlError::new(format!(
+                    "Unable to get request url. Unexpected scheme on new url: {}",
+                    new_string
+                )))
+            }
+        } else {
+            Err(SqrlError::new(format!(
+                "Unable to get request url. Invalid new url: {}",
+                new_string
+            )))
+        }
     }
 
     fn get_domain(&self) -> String {
