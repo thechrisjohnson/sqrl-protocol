@@ -10,7 +10,7 @@ repository = "https://github.com/thechrisjohnson/sqrl-protocol"
 
 [dependencies]
 base64 = "0.22.0"
-ed25519-dalek = "2.1.1"
+ed25519-dalek = "3.0.0"
 url = "2.5.0"
 
 [dev-dependencies]
