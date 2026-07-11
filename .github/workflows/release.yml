@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: Publish crate (dry-run)
       run: cargo publish --verbose --dry-run
     - name: Publish crate
