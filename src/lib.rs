@@ -30,7 +30,12 @@ const REQUEST_FULL_URL_SCHEME: &str = "https://";
 /// Parses a SQRL url and breaks it into its parts
 #[derive(Clone, Debug, PartialEq)]
 pub struct SqrlUrl {
-    url: Url,
+    original: String,
+    parsed: Url,
+    nut: String,
+    cancel_url: Option<Url>,
+    path_extension: Option<usize>,
+    query_parameters: HashMap<String, String>,
 }
 
 impl SqrlUrl {
@@ -41,7 +46,11 @@ impl SqrlUrl {
     /// let sqrl_url = SqrlUrl::parse("sqrl://example.com?nut=1234abcd").unwrap();
     /// ```
     pub fn parse(url: &str) -> std::result::Result<Self, SqrlUrlError> {
-        let parsed = Url::parse(url)?;
+        let parsed = match Url::parse(url) {
+            Ok(url) => url,
+            Err(_) => return Err(SqrlUrlError::InvalidUrl),
+        };
+
         if parsed.scheme() != SQRL_PROTOCOL {
             return Err(SqrlUrlError::UnsupportedScheme);
         }
@@ -49,7 +58,117 @@ impl SqrlUrl {
             return Err(SqrlUrlError::MissingHost);
         }
 
-        Ok(SqrlUrl { url: parsed })
+        let mut query_parameters = HashMap::<String, String>::new();
+        for pair in parsed.query_pairs() {
+            if query_parameters.contains_key(&*pair.0) {
+                return Err(SqrlUrlError::DuplicateParameter((*pair.0).to_string()));
+            }
+
+            query_parameters.insert((*pair.0).to_string(), (*pair.1).to_string());
+        }
+
+        let nut;
+        if let Some(value) = query_parameters.get("nut") {
+            nut = value.to_string();
+        } else {
+            return Err(SqrlUrlError::MissingNut);
+        }
+
+        let cancel_url = match query_parameters.get("can") {
+            Some(value) => {
+                if let Ok(decoded_vec) = BASE64_URL_SAFE_NO_PAD.decode(value) {
+                    if let Ok(decoded_value) = String::from_utf8(decoded_vec) {
+                        if let Ok(url) = Url::parse(&decoded_value) {
+                            Some(url)
+                        } else {
+                            return Err(SqrlUrlError::InvalidCancelUrl);
+                        }
+                    } else {
+                        return Err(SqrlUrlError::InvalidCancelUrl);
+                    }
+                } else {
+                    return Err(SqrlUrlError::InvalidCancelUrl);
+                }
+            }
+            None => None,
+        };
+
+        let path_extension = match query_parameters.get("x") {
+            Some(value) => {
+                if let Ok(x) = value.parse::<usize>() {
+                    Some(x)
+                } else {
+                    return Err(SqrlUrlError::InvalidPathExtension);
+                }
+            }
+            None => None,
+        };
+
+        Ok(SqrlUrl {
+            parsed,
+            original: url.to_owned(),
+            nut,
+            cancel_url,
+            path_extension,
+            query_parameters,
+        })
+    }
+
+    /// Parses a base64 url-safe value into a SqrlUrl
+    pub fn from_base64url(encoded: &str) -> std::result::Result<Self, SqrlUrlError> {
+        let decoded_data = match BASE64_URL_SAFE_NO_PAD.decode(encoded) {
+            Ok(d) => d,
+            Err(_) => return Err(SqrlUrlError::InvalidBase64),
+        };
+
+        let data = match String::from_utf8(decoded_data) {
+            Ok(d) => d,
+            Err(_) => return Err(SqrlUrlError::InvalidUtf8),
+        };
+
+        Self::parse(&data)
+    }
+
+    /// Gets the original string passed in for parsing
+    pub fn original(&self) -> &str {
+        &self.original
+    }
+
+    /// Gets the host value of this url
+    pub fn host(&self) -> &str {
+        // TODO: I don't want to unwrap here
+        self.parsed.domain().unwrap()
+    }
+
+    /// Gets the port value of this url
+    pub fn port(&self) -> u16 {
+        // TODO: I don't want to unwrap here
+        self.parsed.port().unwrap()
+    }
+
+    /// Gets the path value of this url
+    pub fn path(&self) -> &str {
+        self.parsed.path()
+    }
+
+    /// Gets the parsed nut value from the query parameters
+    pub fn nut(&self) -> &str {
+        &self.nut
+    }
+
+    /// Gets the parsed can value from the query parameters
+    pub fn cancel_url(&self) -> Option<&Url> {
+        self.cancel_url.as_ref()
+    }
+
+    /// Gets the parsed x value from the query parameters
+    pub fn path_extension(&self) -> Option<usize> {
+        self.path_extension
+    }
+
+    /// Gets the parsed query parameters
+    pub fn query_parameters(&self) -> impl Iterator<Item = (&String, &String)> {
+        self.query_parameters.iter()
     }
 
     /// Get the auth domain used for calculating identities
@@ -57,10 +176,15 @@ impl SqrlUrl {
     /// use sqrl_protocol::SqrlUrl;
     ///
     /// let sqrl_url = SqrlUrl::parse("sqrl://example.com/auth/path?nut=1234abcd").unwrap();
-    /// assert_eq!("example.com/auth/path", sqrl_url.get_auth_domain())
+    /// assert_eq!("example.com/auth/path", sqrl_url.site_key_string().unwrap())
     /// ```
-    pub fn get_auth_domain(&self) -> String {
-        format!("{}{}", self.get_domain(), self.get_path())
+    pub fn site_key_string(&self) -> std::result::Result<String, SqrlUrlError> {
+        let mut path = self.path();
+        if let Some(extension) = self.path_extension {
+            (path, _) = path.split_at(extension);
+        }
+
+        Ok(format!("{}{}", self.host(), path))
     }
 
     /// Convert a SQRL Url into a URL that can be used for actually querying a server
@@ -72,25 +196,14 @@ impl SqrlUrl {
     /// assert_eq!("https://example.com/auth/path?nut=1234abcd", sqrl_url.get_request_url())
     /// ```
     pub fn get_request_url(&self) -> String {
-        self.url
-            .as_str()
+        self.original
             .replace(SQRL_FULL_URL_SCHEME, REQUEST_FULL_URL_SCHEME)
-            .to_owned()
-    }
-
-    fn get_domain(&self) -> String {
-        self.url.domain().unwrap().to_lowercase()
-    }
-
-    fn get_path(&self) -> String {
-        let path = self.url.path().strip_suffix('/').unwrap_or(self.url.path());
-        path.to_owned()
     }
 }
 
 impl fmt::Display for SqrlUrl {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.url)
+        write!(f, "{}", self.original())
     }
 }
 
@@ -391,15 +504,15 @@ mod tests {
     }
 
     #[test]
-    fn sqrl_url_get_auth_domain_includes_path() {
+    fn sqrl_url_site_key_string_includes_path() {
         let url = SqrlUrl::parse(VALID_SQRL_URL).unwrap();
-        assert_eq!(&url.get_auth_domain(), "example.com/auth/path");
+        assert_eq!(url.site_key_string().unwrap(), "example.com/auth/path");
     }
 
     #[test]
-    fn sqrl_url_get_auth_domain_no_path_if_not_passed() {
+    fn sqrl_url_get_site_key_string_no_path_if_not_passed() {
         let url = SqrlUrl::parse("sqrl://example.com?nut=123").unwrap();
-        assert_eq!(&url.get_auth_domain(), "example.com");
+        assert_eq!(&url.site_key_string().unwrap(), "example.com");
     }
 
     #[test]

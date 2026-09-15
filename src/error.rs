@@ -75,7 +75,7 @@ pub enum SqrlUrlError {
     /// The url is missing a nut paramete
     MissingNut,
     /// Duplicate parameter values
-    DuplicateParameter(&'static str),
+    DuplicateParameter(String),
     /// Invalid cancel url
     InvalidCancelUrl,
     /// Invalid path extension
@@ -83,6 +83,7 @@ pub enum SqrlUrlError {
     /// Path extension value out of range
     PathExtensionOutOfRange,
 }
+
 impl fmt::Display for SqrlUrlError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -105,9 +106,3 @@ impl fmt::Display for SqrlUrlError {
 }
 
 impl std::error::Error for SqrlUrlError {}
-
-impl From<url::ParseError> for SqrlUrlError {
-    fn from(_: url::ParseError) -> Self {
-        SqrlUrlError::InvalidUrl
-    }
-}
