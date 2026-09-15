@@ -5,7 +5,7 @@ pub mod client_request;
 pub mod error;
 pub mod server_response;
 
-use crate::error::SqrlError;
+use crate::error::{SqrlError, SqrlUrlError};
 use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
 use ed25519_dalek::{Signature, VerifyingKey};
 use std::{collections::HashMap, fmt, result};
@@ -40,19 +40,13 @@ impl SqrlUrl {
     ///
     /// let sqrl_url = SqrlUrl::parse("sqrl://example.com?nut=1234abcd").unwrap();
     /// ```
-    pub fn parse(url: &str) -> Result<Self> {
+    pub fn parse(url: &str) -> std::result::Result<Self, SqrlUrlError> {
         let parsed = Url::parse(url)?;
         if parsed.scheme() != SQRL_PROTOCOL {
-            return Err(SqrlError::new(format!(
-                "Invalid sqrl url, incorrect protocol: {}",
-                url
-            )));
+            return Err(SqrlUrlError::UnsupportedScheme);
         }
         if parsed.domain().is_none() {
-            return Err(SqrlError::new(format!(
-                "Invalid sqrl url, missing domain: {}",
-                url
-            )));
+            return Err(SqrlUrlError::MissingHost);
         }
 
         Ok(SqrlUrl { url: parsed })
