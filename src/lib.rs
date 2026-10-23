@@ -54,9 +54,6 @@ impl SqrlUrl {
         if parsed.scheme() != SQRL_PROTOCOL {
             return Err(SqrlUrlError::UnsupportedScheme);
         }
-        if parsed.domain().is_none() {
-            return Err(SqrlUrlError::MissingHost);
-        }
 
         let mut query_parameters = HashMap::<String, String>::new();
         for pair in parsed.query_pairs() {
@@ -136,14 +133,12 @@ impl SqrlUrl {
 
     /// Gets the host value of this url
     pub fn host(&self) -> &str {
-        // TODO: I don't want to unwrap here
-        self.parsed.domain().unwrap()
+        self.parsed.authority()
     }
 
     /// Gets the port value of this url
     pub fn port(&self) -> u16 {
-        // TODO: I don't want to unwrap here
-        self.parsed.port().unwrap()
+        self.parsed.port().unwrap_or(443)
     }
 
     /// Gets the path value of this url
@@ -495,6 +490,12 @@ mod tests {
     fn sqrl_url_parse_errors_on_invalid_url() {
         let url = SqrlUrl::parse("invalid-url-string");
         assert!(url.is_err());
+    }
+
+    #[test]
+    fn sqrl_url_authority_for_ip_address() {
+        let url = SqrlUrl::parse("sqrl://192.168.1.1/auth/path?nut=1234abcd").unwrap();
+        assert_eq!("192.168.1.1", url.host());
     }
 
     #[test]
